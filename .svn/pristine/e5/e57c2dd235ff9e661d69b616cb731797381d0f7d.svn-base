@@ -1,0 +1,260 @@
+package com.gaddiel.remote;
+
+import android.app.Activity;
+import android.app.IntentService;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.PowerManager;
+import android.os.PowerManager.WakeLock;
+import android.telephony.SmsManager;
+import android.util.Log;
+import android.widget.TextView;
+import android.widget.Toast;
+
+public class Send extends Service {
+	Handler m_handler;
+	Runnable m_handlerTask ;
+	Boolean checker;	
+	String phonno;
+	String body;
+	String locations;	
+	long timeval;
+	protected static final String SMS_RECEIVED = "android.provider.Telephony.SMS_RECEIVED";
+	@Override
+	public IBinder onBind(Intent intent) {
+		return null;
+	}	
+	@Override
+	public int onStartCommand( Intent intents, int flags, int startId)
+	{
+	      super.onStartCommand(intents, flags, startId);     
+		LocationManager locationManager;
+	    locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+	    Criteria criteria = new Criteria();
+	    criteria.setAccuracy(Criteria.ACCURACY_FINE);
+	    criteria.setAltitudeRequired(false);
+	    criteria.setBearingRequired(false);
+	    criteria.setCostAllowed(true);
+	    criteria.setPowerRequirement(Criteria.POWER_LOW);
+	   // String provider = locationManager.getBestProvider(criteria, true);
+	    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0, locationListener);
+	    Location location = locationManager.getLastKnownLocation(locationManager.GPS_PROVIDER);	    
+	    updateWithNewLocation(location);	    
+	   // locationManager.requestLocationUpdates(provider, 2000, 10, locationListener);         
+	    Bundle extras = intents.getExtras();
+	        phonno =extras.getString("phonno").toString();
+	       body = extras.getString("body").toString();     
+	       if(body.equals("gaddielTrack#Stop")){
+	           android.os.Process.killProcess(android.os.Process.myPid());
+	            }
+	                      if(body.equals("gaddielTrack#E5min")){
+	                       timeval=60000;                  
+	                      }                
+	                      else if(body.equals("gaddielTrack#E10min")){
+	                       timeval=300000;
+	                      
+	                      }                 
+	                      else if(body.equals("gaddielTrack#E15min")){
+	                       timeval=900000;
+	                      }
+	                      
+	                      else if(body.equals("gaddielTrack#E30min")){
+	                         timeval=1800000;
+	                        }
+	                      
+	                      else if(body.equals("gaddielTrack#Hrs")){
+	                       timeval=3600000;
+	                      }
+	                      
+	                      else if(body.equals("gaddielTrack#Dys")){
+	                       timeval=86400000;
+	                      }
+	                      
+	                      else if(body.equals("gaddielTrack#Wkys")){
+	                       timeval=604800000;
+	                      }
+	                      
+	                      else if(body.equals("gaddielTrack#Mnths")){
+	                     
+	                       timeval=2592000000L;
+	                      }
+	                      
+	                      else if(body.equals("gaddielTrack#Yrs")){
+	                       timeval=31536000000L;
+	                       
+	                      }   
+	                 
+	                      else{
+	                       return 0;
+	                      }             
+	             m_handler = new Handler();   
+	             
+	             m_handlerTask = new Runnable()
+	             {  
+	                @Override 
+	                public void run() {  
+
+	                 m_handler.postDelayed(m_handlerTask, timeval);   
+	                 /*LocationManager locationManager;
+	         	    locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+	         	   locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0, locationListener);
+	                 Location location = locationManager.getLastKnownLocation(locationManager.GPS_PROVIDER);
+	                 updateWithNewLocation(location);*/
+	               sendSMS(phonno, locations);
+	                        }           
+	                }; 
+	                m_handlerTask.run();	 
+	                return START_REDELIVER_INTENT;	                
+	       }
+	    private void sendSMS(String phoneNumber, String message)
+	    {
+	    String SENT = "SMS_SENT";
+	    String DELIVERED = "SMS_DELIVERED";
+	    PendingIntent sentPI = PendingIntent.getBroadcast(this, 0,
+	    new Intent(SENT), 0);
+	    PendingIntent deliveredPI = PendingIntent.getBroadcast(this, 0,new Intent(DELIVERED), 0);
+	    //---when the SMS has been sent---
+	    registerReceiver(new BroadcastReceiver(){
+	    @Override
+	    public void onReceive(Context arg0, Intent arg1) {
+	    switch (getResultCode())
+	    {
+	    case Activity.RESULT_OK:
+	    Toast.makeText(getBaseContext(), "SMS sent",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    case SmsManager.RESULT_ERROR_GENERIC_FAILURE:
+	    Toast.makeText(getBaseContext(), "Generic failure",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    case SmsManager.RESULT_ERROR_NO_SERVICE:
+	    Toast.makeText(getBaseContext(), "No service",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    case SmsManager.RESULT_ERROR_NULL_PDU:
+	    Toast.makeText(getBaseContext(), "Null PDU",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    case SmsManager.RESULT_ERROR_RADIO_OFF:
+	    Toast.makeText(getBaseContext(), "Radio off",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    }
+	    }
+	    }, new IntentFilter(SENT));
+	    //---when the SMS has been delivered---
+	    registerReceiver(new BroadcastReceiver(){
+	    @Override
+	    public void onReceive(Context arg0, Intent arg1) {
+	    switch (getResultCode())
+	    {
+	    case Activity.RESULT_OK:
+	    Toast.makeText(getBaseContext(), "SMS delivered",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    case Activity.RESULT_CANCELED:
+	    Toast.makeText(getBaseContext(), "SMS not delivered",
+	    Toast.LENGTH_SHORT).show();
+	    break;
+	    }
+	    }
+	    }, new IntentFilter(DELIVERED));
+	    SmsManager sms = SmsManager.getDefault();
+	   /* LocationManager locationManager;
+ 	    locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+ 	   locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0, locationListener);
+         Location location = locationManager.getLastKnownLocation(locationManager.GPS_PROVIDER);
+         updateWithNewLocation(location);*/
+	    sms.sendTextMessage(phoneNumber, null, message, sentPI, deliveredPI);
+	    }
+	    
+	    private final LocationListener locationListener = new LocationListener() {
+	        public void onLocationChanged(Location location) {
+	          updateWithNewLocation(location);
+	        }
+	         
+	        public void onProviderDisabled(String provider){
+	          updateWithNewLocation(null);
+	        }
+
+	        public void onProviderEnabled(String provider){}
+
+	        public void onStatusChanged(String provider, int status, Bundle extras) {}
+	      };
+	    private void updateWithNewLocation(Location location) {
+	        
+	    	LocationManager locationManager;
+		    locationManager = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+
+	            // getting GPS status
+	            boolean isGPSEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+
+	            // getting network status
+	            boolean isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+	            if (isNetworkEnabled) {
+	            	locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, locationListener);
+	            	String latLongString;
+	            	if (locationManager != null) {
+	            		location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+	            		if (location != null) {
+	            			double lat = location.getLatitude();
+	            			double lng = location.getLongitude();
+	            			latLongString = "http://maps.google.com/maps/?q=loc:"+lat+","+lng;
+	            		} else {
+	            			latLongString = "No location found"; 
+	            		}
+	        
+	      //  myLocationText.setText("My Current Position is:\n" + latLongString);  
+	            		locations=latLongString;
+	            		}
+	        
+	            }
+	        
+	            else if (!isNetworkEnabled && isGPSEnabled) {
+	        	
+	            	String latLongString;
+               
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,0,0, locationListener );
+                    Log.d("GPS Enabled", "GPS Enabled");
+                    if (locationManager != null) {location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                        if (location != null) {
+                        	double lat = location.getLatitude();
+                        	double lng = location.getLongitude();
+                        	latLongString = "http://maps.google.com/maps/?q=loc:"+lat+","+lng;
+                        }
+                        else {
+              	          latLongString = "No location found"; 
+              	        }
+                    
+                        locations=latLongString;
+                    }
+                
+               
+	        }
+	            else{
+	            	String latLongString;
+	            	latLongString = "No location found";
+	            	locations=latLongString;
+	            }
+	        
+	}
+	    
+	     public void onReceive1(Context context, Intent intent) {                
+	        Intent i = new Intent(context, IncomingSms.class); 
+	        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+	        context.startService(i);       
+	        
+	    }
+}
